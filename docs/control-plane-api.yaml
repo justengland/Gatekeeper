@@ -1,0 +1,333 @@
+openapi: 3.0.3
+info:
+  title: Gatekeeper Control Plane API
+  version: 0.1.0
+  description: |
+    The Control Plane receives session requests, enqueues jobs for the Agent, and
+    exposes session lifecycle endpoints. Auth supports **API Key** and **JWT**.
+    
+    This file mirrors control-plane/control-plane.openapi.yaml and is kept in sync.
+servers:
+  - url: http://localhost:4000
+    description: Local dev
+  - url: https://api.gatekeeper.example.com
+    description: Production
+tags:
+  - name: Sessions
+    description: Create, inspect, list, and revoke ephemeral DB sessions
+  - name: Health
+  - name: Metrics
+security:
+  # Endpoints accept either API key or Bearer JWT (OR semantics)
+  - ApiKeyAuth: []
+  - BearerAuth: []
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /metrics:
+    get:
+      tags: [Metrics]
+      summary: Prometheus metrics
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Prometheus metrics in text format
+          content:
+            text/plain:
+              schema:
+                type: string
+  /v1/sessions:
+    post:
+      tags: [Sessions]
+      summary: Create a new ephemeral DB session
+      operationId: createSession
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+            examples:
+              createAppRead:
+                value:
+                  targetId: "pg-local"
+                  role: "app_read"
+                  ttlMinutes: 15
+                  reason: "debugging"
+      responses:
+        '201':
+          description: Session created (may be pending or ready)
+          headers:
+            Location:
+              description: URL to fetch the created session
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Duplicate request (Idempotency key conflict)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      tags: [Sessions]
+      summary: List sessions
+      operationId: listSessions
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/SessionStatus'
+        - name: role
+          in: query
+          schema:
+            $ref: '#/components/schemas/Role'
+        - name: targetId
+          in: query
+          schema:
+            type: string
+        - name: requesterId
+          in: query
+          schema:
+            type: string
+        - name: createdFrom
+          in: query
+          description: ISO timestamp filter (start)
+          schema:
+            type: string
+            format: date-time
+        - name: createdTo
+          in: query
+          description: ISO timestamp filter (end)
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: sort
+          in: query
+          description: Sort by field (e.g., createdAt:desc)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A page of sessions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/sessions/{id}:
+    get:
+      tags: [Sessions]
+      summary: Get a session by ID
+      operationId: getSession
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/sessions/{id}/revoke:
+    post:
+      tags: [Sessions]
+      summary: Revoke a session early
+      operationId: revokeSession
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session revoked (or already expired/revoked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        Provide a unique key to make the request idempotent. Replays with the same key return the original result.
+      schema:
+        type: string
+        maxLength: 128
+  responses:
+    BadRequest:
+      description: The request could not be understood or failed validation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Authenticated, but not allowed by policy/RBAC
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        version: { type: string, example: 0.1.0 }
+        uptimeSeconds: { type: number, example: 123.45 }
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            db: ok
+            queue: ok
+    SessionStatus:
+      type: string
+      enum: [pending, ready, revoked, expired, failed]
+    Role:
+      type: string
+      enum: [app_read, app_write, app_admin]
+    CreateSessionRequest:
+      type: object
+      required: [targetId, role, ttlMinutes]
+      properties:
+        targetId:
+          type: string
+          description: Identifier of a configured DatabaseTarget
+        role:
+          $ref: '#/components/schemas/Role'
+        ttlMinutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+        reason:
+          type: string
+          maxLength: 256
+        requester:
+          description: Optional override of requester identity (usually inferred from auth)
+          type: object
+          properties:
+            userId: { type: string }
+            email: { type: string, format: email }
+    Session:
+      type: object
+      required: [id, status, role, targetId, createdAt]
+      properties:
+        id: { type: string, example: ses_01HVJ3C5Z6W6WZ }
+        status: { $ref: '#/components/schemas/SessionStatus' }
+        role: { $ref: '#/components/schemas/Role' }
+        targetId: { type: string, example: pg-local }
+        requester:
+          type: object
+          properties:
+            userId: { type: string, example: u_123 }
+            email: { type: string, format: email, example: user@example.com }
+        ttlMinutes: { type: integer, example: 15 }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        dsn:
+          type: string
+          nullable: true
+          description: Returned only when status is 'ready'. Redacted in logs.
+          example: postgresql://gk_xxx:****@localhost:5432/app
+        error:
+          type: object
+          nullable: true
+          properties:
+            code: { type: string, example: AGENT_UNAVAILABLE }
+            message: { type: string }
+    SessionList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Session'
+        pageInfo:
+          type: object
+          properties:
+            page: { type: integer, example: 1 }
+            limit: { type: integer, example: 50 }
+            totalItems: { type: integer, example: 123 }
+            totalPages: { type: integer, example: 3 }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, example: BAD_REQUEST }
+        message: { type: string, example: ttlMinutes must be between 1 and 1440 }
+        correlationId: { type: string, example: c07a0c9b-7f6d-4b8f-8b0c-1d8b9eb9f4f8 }

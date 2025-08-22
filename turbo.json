@@ -1,0 +1,36 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["**/.env.*local"],
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "inputs": ["src/**/*.ts", "src/**/*.json", "package.json", "tsconfig*.json"]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": ["coverage/**"],
+      "inputs": ["src/**/*.ts", "test/**/*.ts", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    "lint": {
+      "outputs": [],
+      "inputs": ["src/**/*.ts", "test/**/*.ts", "**/*.test.ts", "**/*.spec.ts", ".eslintrc*"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "inputs": ["src/**/*.ts", "test/**/*.ts", "**/*.test.ts", "**/*.spec.ts", "tsconfig*.json"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "gen:openapi": {
+      "outputs": ["src/generated/**"],
+      "inputs": ["../../**/*.openapi.yaml", "../../**/*.swagger.yaml"]
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

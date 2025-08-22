@@ -1,0 +1,33 @@
+{
+  "name": "@gatekeeper/sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "TypeScript SDK client generated from OpenAPI specs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo",
+    "gen:openapi": "openapi-generator-cli generate -i ../../control-plane/control-plane.openapi.yaml -g typescript-fetch -o ./src/generated --additional-properties=typescriptThreePlus=true"
+  },
+  "dependencies": {
+    "@gatekeeper/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@openapitools/openapi-generator-cli": "^2.7.0",
+    "@types/node": "^20.11.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init:*)",
+      "Bash(mkdir:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm --filter shared test)",
+      "Bash(chmod:*)",
+      "Bash(./infra-dev/scripts/start-services.sh:*)",
+      "Bash(docker:*)",
+      "Bash(./infra-dev/scripts/test-db.sh:*)",
+      "Bash(npm install)",
+      "Bash(./tests/integration/run-integration-tests.sh:*)",
+      "Bash(mv:*)",
+      "Bash(./tests/integration/run-simple-tests.sh:*)",
+      "Bash(pnpm --filter agent dev)",
+      "Bash(pnpm --filter cli build)",
+      "Bash(pnpm --filter cli start agent health)",
+      "Bash(pnpm --filter shared build)",
+      "Bash(curl:*)",
+      "Bash(PGSSLMODE=disable pnpm --filter agent dev)",
+      "Bash(PGSSLMODE=disable pnpm --filter cli start agent health)",
+      "Bash(PGSSLMODE=disable pnpm --filter cli start session list)",
+      "Bash(PGSSLMODE=disable pnpm --filter cli start agent test)",
+      "Bash(pnpm --filter shared lint)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm --filter shared exec -- ts-standard 'src/**/*.ts' --fix)",
+      "Bash(pnpm:*)",
+      "Bash(PGSSLMODE=disable pnpm --filter user-mgmt start create --username bob_admin --email bob@example.com --name \"Bob Administrator\" --type admin --roles app_admin,app_read --reason \"Testing admin user creation\")",
+      "Bash(grep:*)",
+      "Bash(gh auth:*)",
+      "Bash(unset GH_TOKEN)",
+      "Bash(unset GITHUB_TOKEN)",
+      "Bash(GH_TOKEN=\"\" GITHUB_TOKEN=\"\" gh api user --jq '.login')",
+      "Bash(git add:*)"
+    ],
+    "deny": []
+  }
+}

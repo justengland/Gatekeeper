@@ -1,0 +1,312 @@
+openapi: 3.0.3
+info:
+  title: Gatekeeper Agent API
+  version: 0.1.0
+  description: |
+    The Agent executes database operations for ephemeral session management.
+    In production, this runs as a Lambda function. For local development,
+    it runs as an HTTP service that processes jobs from the Control Plane.
+servers:
+  - url: http://localhost:4001
+    description: Local development
+  - url: https://lambda-url.us-east-1.on.aws
+    description: Production Lambda
+tags:
+  - name: Jobs
+    description: Process database session jobs
+  - name: Health
+    description: Agent health and status
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: getAgentHealth
+      responses:
+        '200':
+          description: Agent is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /jobs:
+    post:
+      tags: [Jobs]
+      summary: Process a job (create session, revoke session, cleanup)
+      operationId: processJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/CreateSessionJob'
+                - $ref: '#/components/schemas/RevokeSessionJob'
+                - $ref: '#/components/schemas/CleanupJob'
+            examples:
+              createSession:
+                summary: Create ephemeral session
+                value:
+                  id: "job_01HVJ3C5Z6W6WZ"
+                  correlationId: "c07a0c9b-7f6d-4b8f-8b0c-1d8b9eb9f4f8"
+                  type: "create_session"
+                  target:
+                    host: "localhost"
+                    port: 5432
+                    database: "app"
+                    sslMode: "disable"
+                  role: "app_read"
+                  ttlMinutes: 15
+                  requester:
+                    userId: "u_123"
+                    email: "user@example.com"
+                  reason: "debugging"
+              revokeSession:
+                summary: Revoke existing session
+                value:
+                  id: "job_01HVJ3C5Z6W6WZ"
+                  correlationId: "c07a0c9b-7f6d-4b8f-8b0c-1d8b9eb9f4f8"
+                  type: "revoke_session"
+                  sessionId: "ses_01HVJ3C5Z6W6WZ"
+      responses:
+        '200':
+          description: Job processed successfully
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/CreateSessionResult'
+                  - $ref: '#/components/schemas/RevokeSessionResult'
+                  - $ref: '#/components/schemas/CleanupResult'
+        '400':
+          description: Invalid job payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal agent error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, version]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+        version:
+          type: string
+          example: "0.1.0"
+        uptimeSeconds:
+          type: number
+          example: 123.45
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            database: ok
+            rolepack: ok
+    
+    DatabaseTarget:
+      type: object
+      required: [host, port, database]
+      properties:
+        host:
+          type: string
+          example: "localhost"
+        port:
+          type: integer
+          example: 5432
+        database:
+          type: string
+          example: "app"
+        sslMode:
+          type: string
+          enum: [disable, require, prefer]
+          default: prefer
+    
+    Requester:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+          example: "u_123"
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+    
+    CreateSessionJob:
+      type: object
+      required: [id, correlationId, type, target, role, ttlMinutes, requester]
+      properties:
+        id:
+          type: string
+          description: Idempotency key
+          example: "job_01HVJ3C5Z6W6WZ"
+        correlationId:
+          type: string
+          format: uuid
+          example: "c07a0c9b-7f6d-4b8f-8b0c-1d8b9eb9f4f8"
+        type:
+          type: string
+          enum: [create_session]
+        target:
+          $ref: '#/components/schemas/DatabaseTarget'
+        role:
+          type: string
+          enum: [app_read, app_write, app_admin]
+          description: Role pack to grant (Milestone 0 supports app_read only)
+        ttlMinutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+          description: Time to live in minutes (1 to SESSION_MAX_TTL_MINUTES)
+        requester:
+          $ref: '#/components/schemas/Requester'
+        reason:
+          type: string
+          maxLength: 256
+          example: "debugging"
+    
+    RevokeSessionJob:
+      type: object
+      required: [id, correlationId, type, sessionId]
+      properties:
+        id:
+          type: string
+          description: Idempotency key
+          example: "job_01HVJ3C5Z6W6WZ"
+        correlationId:
+          type: string
+          format: uuid
+          example: "c07a0c9b-7f6d-4b8f-8b0c-1d8b9eb9f4f8"
+        type:
+          type: string
+          enum: [revoke_session]
+        sessionId:
+          type: string
+          example: "ses_01HVJ3C5Z6W6WZ"
+    
+    CleanupJob:
+      type: object
+      required: [id, correlationId, type]
+      properties:
+        id:
+          type: string
+          description: Idempotency key
+          example: "job_01HVJ3C5Z6W6WZ"
+        correlationId:
+          type: string
+          format: uuid
+          example: "c07a0c9b-7f6d-4b8f-8b0c-1d8b9eb9f4f8"
+        type:
+          type: string
+          enum: [cleanup]
+        olderThanMinutes:
+          type: integer
+          default: 5
+          description: Clean up sessions expired more than N minutes ago
+    
+    CreateSessionResult:
+      type: object
+      required: [sessionId, status]
+      properties:
+        sessionId:
+          type: string
+          example: "ses_01HVJ3C5Z6W6WZ"
+        status:
+          type: string
+          enum: [ready, failed]
+        dsn:
+          type: string
+          nullable: true
+          description: Database connection string (only present when status is 'ready'). Redacted in logs.
+          example: "postgresql://gk_abc123:****@localhost:5432/app"
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the session expires (ISO timestamp)
+        username:
+          type: string
+          nullable: true
+          description: Generated ephemeral username
+          example: "gk_abc123def456"
+        error:
+          type: object
+          nullable: true
+          properties:
+            code:
+              type: string
+              example: "DB_CONNECTION_FAILED"
+            message:
+              type: string
+              example: "Could not connect to target database"
+            retryable:
+              type: boolean
+              description: Whether the job can be retried
+    
+    RevokeSessionResult:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [revoked, failed, not_found]
+        error:
+          type: object
+          nullable: true
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            retryable:
+              type: boolean
+    
+    CleanupResult:
+      type: object
+      required: [status, cleanedCount]
+      properties:
+        status:
+          type: string
+          enum: [completed, failed]
+        cleanedCount:
+          type: integer
+          description: Number of expired sessions cleaned up
+        error:
+          type: object
+          nullable: true
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+    
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: "INVALID_JOB_TYPE"
+        message:
+          type: string
+          example: "Unknown job type 'invalid_type'"
+        correlationId:
+          type: string
+          format: uuid
+          example: "c07a0c9b-7f6d-4b8f-8b0c-1d8b9eb9f4f8"
+        retryable:
+          type: boolean
+          description: Whether the operation can be retried
+          default: false

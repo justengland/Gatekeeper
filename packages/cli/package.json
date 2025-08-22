@@ -1,0 +1,58 @@
+{
+  "name": "@gatekeeper/cli",
+  "version": "0.1.0",
+  "description": "Gatekeeper CLI - Command line interface for testing and managing ephemeral database sessions",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "gk": "dist/cli.js",
+    "gatekeeper": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "ts-standard",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@gatekeeper/shared": "workspace:*",
+    "commander": "^11.1.0",
+    "chalk": "^5.3.0",
+    "ora": "^7.0.1",
+    "inquirer": "^9.2.12",
+    "table": "^6.8.1",
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.2",
+    "pg": "^8.11.3",
+    "uuid": "^9.0.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.10",
+    "@types/pg": "^8.10.7",
+    "@types/inquirer": "^9.0.7",
+    "@types/uuid": "^9.0.7",
+    "tsx": "^4.6.0",
+    "typescript": "^5.2.2",
+    "vitest": "^1.6.1",
+    "@vitest/coverage-v8": "^1.6.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "gatekeeper",
+    "cli",
+    "database",
+    "ephemeral",
+    "sessions",
+    "postgresql",
+    "testing"
+  ]
+}

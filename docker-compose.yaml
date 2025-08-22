@@ -1,0 +1,100 @@
+services:
+  # PostgreSQL 16 - Primary database for Gatekeeper
+  postgres:
+    image: postgres:16-alpine  # Use alpine for smaller size
+    container_name: gatekeeper-postgres
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      # Performance and security settings
+      POSTGRES_SHARED_PRELOAD_LIBRARIES: pg_stat_statements
+      POSTGRES_LOG_STATEMENT: all
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra-dev/sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - gatekeeper
+
+  # LocalStack - AWS services emulation for Lambda testing  
+  localstack:
+    image: localstack/localstack:3.0
+    container_name: gatekeeper-localstack
+    ports:
+      - "4566:4566"            # LocalStack Gateway
+      - "4510-4559:4510-4559"  # External service port range
+    environment:
+      # Core configuration
+      DEBUG: ${DEBUG:-0}
+      SERVICES: lambda,logs,iam,sts,s3,sqs
+      LAMBDA_EXECUTOR: local
+      LOCALSTACK_API_KEY: ${LOCALSTACK_API_KEY:-}
+      
+      # Persistence
+      PERSISTENCE: 1
+      
+      # Docker configuration
+      DOCKER_HOST: unix:///var/run/docker.sock
+      
+      # Lambda configuration
+      LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT: 30
+      LAMBDA_REMOVE_CONTAINERS: true
+      
+      # Development settings
+      SKIP_INFRA_DOWNLOADS: 0
+      EAGER_SERVICE_LOADING: 1
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - gatekeeper
+
+  # Redis - Optional caching and job queue (for future use)
+  redis:
+    image: redis:7-alpine
+    container_name: gatekeeper-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - gatekeeper
+    profiles:
+      - full  # Optional service, only started with 'docker compose --profile full up'
+
+volumes:
+  postgres_data:
+    driver: local
+  localstack_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  gatekeeper:
+    driver: bridge
+    name: gatekeeper-network

@@ -1,0 +1,81 @@
+# Git
+.git
+.gitignore
+
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist
+build
+.next
+.nuxt
+
+# Test artifacts
+coverage
+test-results
+playwright-report
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env*
+!.env.example
+
+# Logs
+logs
+*.log
+
+# Cache
+.cache
+.turbo
+.npm
+.pnpm-debug.log*
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# Documentation (not needed in container)
+docs
+*.md
+!README.md
+
+# Development files
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# Test files (if not needed in production)
+**/*.test.js
+**/*.test.ts
+**/*.spec.js
+**/*.spec.ts
+test/
+tests/
+__tests__/
+
+# Development dependencies
+devDependencies
+
+# Local development
+.env.local
+.env.development
+
+# Docker files (avoid recursion)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
